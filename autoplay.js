@@ -26,7 +26,7 @@ javascript:(function(netflix, undefined) {
 	currrentEpisodeId = parseInt(idregx.exec(epIdRegex.exec(init)), 10);
 	currentMovieId = parseInt(netflix.Silverlight.MoviePlayer.getPlugin().settings.movieId, 10);
 
-	//Check if the user has already loded teh bookmarklet
+	//Check if the user has already loded the bookmarklet
 	var autoplayElement = document.getElementById('NetflixAutoplay');
 	if(autoplayElement) {
 		alert('You have already loaded the autoplay bookmarklet, click the text at the botton to change number of episodes.');
@@ -46,7 +46,7 @@ javascript:(function(netflix, undefined) {
 		return;
 	}
 
-	//set our pointest to match the episode we are currently on
+	//set our pointer to match the episode we are currently on
 	seasons = showData.Show.Seasons;
 	for(seasonId = 0; seasonId < seasons.length; seasonId++) {
 		for(episodeId = 0; episodeId < seasons[seasonId].Episodes.length; episodeId++) {
