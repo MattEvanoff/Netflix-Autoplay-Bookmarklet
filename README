@@ -1,0 +1,20 @@
+Netflix Autoplay Bookmarklet
+
+This thing is pretty simple it lets you autoplay the next episode of a show while watching it on Netflix.  It is a bookmarklet, and as such, all the comments need to be removed, and it needs to be minified a bit before it will work.  Last time I used this:
+http://www.zenoplex.jp/tools/javascript_packer.html 
+unfortunately bookmarklets need minification that is a bit more special than normal javascript, but this one seems to be doing the job.
+
+Currently the minified code is:
+
+javascript:(function(){var eppsWatched=1,movieIDrgx=/movieid=\d*[&amp;|#]/,trackIDrgx=/trkid=\d*[&amp;|#]/,episoIDrgx=/episodeMovieId=\d*[&amp;|#]/,idregx=/\d+/,epps,movieId,trkId,eppId,sl,tmp;try{sl=netflix.Silverlight.MoviePlayer.getPlugin().getScriptInterface()||false;}catch(e){sl=false;}if(!sl){alert('Please start the first episode you wish to watch.');}else{epps=prompt('How many episodes would you like to play?','3'),epps=parseInt(epps,10);movieId=parseInt((idregx.exec(movieIDrgx.exec(window.location))||[0])[0],10);eppId=parseInt((idregx.exec(episoIDrgx.exec(window.location))||[0])[0],10);trkId=parseInt((idregx.exec(trackIDrgx.exec(window.location))||[0])[0],10);sl.OnMovieWatched=function(){var waiting=null;if(eppsWatched<epps){if(trkId!==0){trkId++;}if(eppId!==0){eppId++;}if(movieId!==0){movieId++;}if(!waiting){waiting=setTimeout(function(){sl.PlayMovie({movieId:movieId,episodeMovieId:eppId,trackId:trkId});eppsWatched++;clearTimeout(waiting);waiting=null;},2*60*1000);}}}}})();
+
+Some things I have considered adding:
+* End-of-show timer length set
+* Episode randomize
+* Episode select/multiple show select
+
+unfortunately I have not found a way to know for sure that the episode is done playing, so currently I am using a timer that waits the amount of time I have found it to take for most shows after the "OnMovieWatched" event is fired.  This is far from ideal, and at the very least letting people change this delay when they find their show is not right would be quite good.
+
+Randomly selecting an episode would be pretty easy given that we have all of the episode data.  If perhaps a dialog or something was added, allow a user to select the episodes they want to watch sould be pretty straightforward.
+
+Using localStorage it would not be hard to store the information about any shows you autoplay.  This would make it easy (enough) to allow you to select episodes from any of them.
