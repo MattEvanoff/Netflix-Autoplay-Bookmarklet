@@ -15,6 +15,40 @@ Some things I have considered adding:
 
 unfortunately I have not found a way to know for sure that the episode is done playing, so currently I am using a timer that waits the amount of time I have found it to take for most shows after the "OnMovieWatched" event is fired.  This is far from ideal, and at the very least letting people change this delay when they find their show is not right would be quite good.
 
-Randomly selecting an episode would be pretty easy given that we have all of the episode data.  If perhaps a dialog or something was added, allow a user to select the episodes they want to watch sould be pretty straightforward.
+Randomly selecting an episode would be pretty easy given that we have all of the episode data.  If perhaps a dialog or something was added, allow a user to select the episodes they want to watch should be pretty straightforward.
 
 Using localStorage it would not be hard to store the information about any shows you autoplay.  This would make it easy (enough) to allow you to select episodes from any of them.
+
+How this shit works:
+
+As long as I am Githubing this, I suppose I should describe how it works.
+
+The basics:
+
+1a. First Netflix uses Silverlight for their player.
+
+2a. Netflix has their own Javascript namespace "netflix".
+
+3a. You can use the Netflix Javascript namespace to grab the Silverlight player.
+
+There are several thing you can grab, but 
+netflix.Silverlight.MoviePlayer.getPlugin().getScriptInterface();
+is the most interesting.  It allows us to use Javascript to interact with the player.
+
+1b. All Netflix videos have an ID (duh).
+
+2b. If we know the ID of a movie, we can use 3a to tell the player to play it using:
+
+'3a'.PlayMovie({movieId: MovieId, episodeMovieId: ???, trackId: ???});
+
+I am not sure what the episodeMovieId or trackId do at the moment, perhaps they are there for future use?  For now I set them to 0 and that seems to work.  The movieId however, is what we are interested in.  If we set it to the ID of the video we want to play, it comes right up...now, now do we get that ID?
+
+1c. Netflix sends all of the information we need every time we load up a show, this information is stored in 2a.
+
+2c. netflix.Silverlight.MoviePlayer.getPlugin().settings.metadata gets us all of the information about a show in a base64 encoded string of JSON data.
+
+...I Suppose I am proud, or maybe ashamed of the fact that it only took a glance for me to see that this data looked as though it was base64 encoded.
+
+1d. We base64 decode the data from 2c, and we have all of the season/episode information about a show, with the IDs needed to make Sliverlight play them
+
+2d. When a show/movie is near ending the Silverlight player fires off an event named "OnMovieWatched", we can hook into this using 3a, grab the ID for the next episode from 2c and away we go...except that it fires before the show is all the way over.  It seems to be about 2 minutes before, so I set a timer for 2 minutes and wait to change till then.
