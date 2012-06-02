@@ -1,140 +1,60 @@
-javascript:(function(netflix, undefined) {
-	var seasonId = 0,
-	episodeId = 0,
-	numWatched = 0,
-	numToWatch = 3,
-	epIdRegex = /,EpisodeMovieId=\d*,/,
-	idregx = /\d+/,
-	done = false,
-	sl,
-	init,
-	currrentEpisodeId,
-	currentMovieId,
-	seasons,
-	showData,
-	waitTimer,
-	node;	
+(function(undefined){
 
-	if(!netflix || !netflix.Silverlight || !netflix.Silverlight.MoviePlayer || !netflix.Silverlight.MoviePlayer.getPlugin() || !netflix.Silverlight.MoviePlayer.getPlugin().settings.initParams) {
-		alert('You do not appear to have a show playing, please start a show first');
-		return;
+	//Takes our countdown timer and converts it to mm:ss and displays to user
+	function updateTime() {
+		var seconds = (countdownTimer % 60) + '';
+		if(seconds.length === 0)
+			seconds = '00';
+		else if(seconds.length === 1)
+			seconds = '0' + seconds;
+
+		timerNode.innerHTML = Math.floor(countdownTimer / 60) + ':' + seconds;
 	}
 
-	//grab the things we need
-	sl = netflix.Silverlight.MoviePlayer.getPlugin().getScriptInterface();
-	init = netflix.Silverlight.MoviePlayer.getPlugin().settings.initParams;
-	currrentEpisodeId = parseInt(idregx.exec(epIdRegex.exec(init)), 10);
-	currentMovieId = parseInt(netflix.Silverlight.MoviePlayer.getPlugin().settings.movieId, 10);
+	//Grabs the data for the episode matching the ID passed in
+	function getCurrentEpisodeData(episodeId) {
+		var episode, i = 0, j = 0;
 
-	//Check if the user has already loded the bookmarklet
-	var autoplayElement = document.getElementById('NetflixAutoplay');
-	if(autoplayElement) {
-		alert('You have already loaded the autoplay bookmarklet, click the text at the botton to change number of episodes.');
-		return;
-	}
-
-	//grab the metadata and decode it
-	try {
-		showData = JSON.parse(decode64(netflix.Silverlight.MoviePlayer.getPlugin().settings.metadata));
-	} catch(e) {
-		alert('Error processing data =(');
-		return;
-	}
-
-	if(showData.Movie) {
-		alert('This appears to be a movie not a TV show.  This bookmarklet only works on TV show.');
-		return;
-	}
-
-	//set our pointer to match the episode we are currently on
-	seasons = showData.Show.Seasons;
-	for(seasonId = 0; seasonId < seasons.length; seasonId++) {
-		for(episodeId = 0; episodeId < seasons[seasonId].Episodes.length; episodeId++) {
-			if(seasons[seasonId].Episodes[episodeId].MovieId === currentMovieId || seasons[seasonId].Episodes[episodeId].MovieId === currrentEpisodeId) {
-				done = true;
-				break;
-			}
-		}
-		if(done) {
-			break;
-		}
-	}
-
-	//check if we were able to find the episode the user is  on
-	if(seasonId === seasons.length) {
-		alert('Error: Already of final episode, or episode data could not be found.');
-		return;
-	}	
-
-	//Prompt user for number of episodes
-	function getNumberOfEpisodesToWatch() {
-		var newNum;
-		do {
-			newNum = prompt('How many episodes would you like to play?', (numToWatch - numWatched));
-		} while (isNaN(newNum));
-
-		numWatched = 0;
-		numToWatch = parseInt(newNum, 10);
-
-		//set the text
-		if(numToWatch > 0) {
-			autoplayElement.innerHTML = 'Netflix autoplay on, Episodes left: ' + numToWatch;
-		} else {
-			autoplayElement.innerHTML = 'Netflix autoplay off';
-		}
-	}	
-
-	//create the text that shows how many episodes left & insert it
-	node = document.createElement('span');
-	autoplayElement = document.body.appendChild(node);
-	autoplayElement.id = 'NetflixAutoplay';
-	autoplayElement.innerHTML = 'Netflix autoplay on, Episodes left: ' + numToWatch;
-
-	//attach a click handler so people can change number of episodes
-	autoplayElement.addEventListener('click', getNumberOfEpisodesToWatch, false);
-
-	//prompt the user for number of episodes for the first time
-	getNumberOfEpisodesToWatch();
-
-	//handle when the episode ends
-	sl.OnMovieWatched = function() {
-		if(numWatched < numToWatch && !waitTimer) {			//Check if done autoplaying
-			waitTimer = setTimeout(function() {				//Set our timer so we do not end early
-				var epp, numLeft;
-
-				//move episode/season counters properly
-				if(seasons[seasonId].Episodes[episodeId+1]) {
-					episodeId++;
-				} else {
-					episodeId = 0;
-					seasonId++;
-				}	
-
-				//if there is a next episode, grab it
-				if(seasons[seasonId] && seasons[seasonId].Episodes[episodeId]) {
-					epp = seasons[seasonId].Episodes[episodeId];
-				}
-
-				//if there is a next episode, play it and update the text
-				if (epp) {
-					sl.PlayMovie({movieId: epp.MovieId, episodeMovieId: 0, trackId: 0});
-					numWatched++;
-					numLeft = numToWatch - numWatched;
-					if(numLeft > 0) {
-						autoplayElement.innerHTML = 'Netflix autoplay on, Episodes left: ' + numLeft;
-					} else {
-						autoplayElement.innerHTML = 'Netflix autoplay completed.';
+		if(episodeData && episodeData.video && episodeData.video.seasons) {
+			for(i=0; i<episodeData.video.seasons.length; i++) {
+				for(j=0; j<episodeData.video.seasons[i].episodes.length; j++) {
+					if(episodeData.video.seasons[i].episodes[j].id === episodeId) {
+						episode = episodeData.video.seasons[i].episodes[j];
+						break;
 					}
 				}
-
-				//cleanup
-				clearTimeout(waitTimer);
-				waitTimer = null;
-			}, 2*60*1000);
+				if(episode)
+					break;
+			}
 		}
-	};
 
-	//This is just a bse64 decoder
+		return episode;
+	}
+
+	//Grabs the data for the episode following the one with the ID passed in
+	function getNextEpisodeData(episodeId) {
+		var episode, i = 0, j = 0, found = false;
+
+		if(episodeData && episodeData.video && episodeData.video.seasons) {
+			for(i=0; i<episodeData.video.seasons.length; i++) {
+				for(j=0; j<episodeData.video.seasons[i].episodes.length; j++) {
+					if(episodeData.video.seasons[i].episodes[j].id === episodeId) {
+						found = true;
+					}
+					else if(found) {
+						episode = episodeData.video.seasons[i].episodes[j];
+						break;
+					}
+				}
+				if(episode)
+					break;
+			}
+		}
+
+		return episode;
+	}
+
+	//base64 decoder
 	function decode64(input) {
 		var keyStr = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=',
 		output = '',
@@ -171,4 +91,194 @@ javascript:(function(netflix, undefined) {
 
 		return unescape(output);
 	}
-})(window.netflix);
+
+	if(window.NetflixAutoplayLoaded) {
+		alert('Autoplay already loaded.');
+		//return false;
+	} else {
+		window.NetflixAutoplayLoaded = true;
+	}
+
+	//resize the player so we can see the text we are about to insert under it
+	document.getElementById('SLPlayer').style.height = (window.innerHeight - 35) + 'px';
+	document.getElementById('SLPlayerWrapper').style.height = (window.innerHeight - 35) + 'px';
+	document.getElementById('page-content').style.height = (window.innerHeight - 35) + 'px';
+
+	//create the text and other shizzy we want
+	var autoplayElement = document.body.appendChild(document.createElement('div'));
+	autoplayElement.id = 'NetflixAutoplayContainer';
+	autoplayElement.innerHTML = '<div id="NetflixAutoplay"></div> <div id="NetflixAutoplayTimerContainer">Time left until switch: <span id="NetflixAutoplayTimer">00:00</span> <span id="NetflixAutoPauser">||</span> <span id="NetflixAutoDelay" contentEditable="true">-</span></div>';
+	var timerNode = document.getElementById('NetflixAutoplayTimer');
+	var autoplayText = document.getElementById('NetflixAutoplay');
+	var pauseButton = document.getElementById('NetflixAutoPauser');
+	var delay = document.getElementById('NetflixAutoDelay');
+
+	//the number of seconds to wait for the show to buffer on load
+	var timerDelay = 10; 
+
+	//Pull the current episode information and the full series data for us
+	var episodeData = JSON.parse(decode64(netflix.Silverlight.MoviePlayer.getPlugin().settings.metadata));
+	var currentEppId = (/,EpisodeMovieId=\d*/.exec(netflix.Silverlight.MoviePlayer.getPlugin().settings.initParams)[0]).split('=')[1];
+
+	//gets data for current & next epps
+	var currentEpp = getCurrentEpisodeData(currentEppId);
+	var nextEpp = getNextEpisodeData(currentEpp.id);
+
+	var paused = false; //bool to see if paused
+	var done = false; //bool to see if finished autoplay
+	var editingTime = false; //bool to check if user is editing time
+
+	//Javascript to execute to change episode
+	var ini = document.getElementsByTagName('script');
+	ini = ini[ini.length-1].innerHTML;
+
+	//Set the countdown till next episode + the pause we need for buffer
+	function updateCountdown() {
+		countdownTimer = parseInt(currentEpp.runtime, 10) + timerDelay;
+	}	
+
+	var countdownTimer = 0; //episode length timer
+	updateCountdown(); //Sets the count down timer for current episode
+
+	//Prompt user for number of episodes
+	var numToWatch = 3;
+	function getNumberOfEpisodesToWatch() {
+		var newNum;
+		do {
+			newNum = prompt('How many episodes would you like to play?', numToWatch);
+		} while (isNaN(newNum));
+
+		numToWatch = parseInt(newNum, 10);
+
+		//set the text
+		if(numToWatch > 0) {
+			autoplayText.innerHTML = 'Netflix autoplay on, Episodes left: ' + numToWatch;
+
+			if(done) { //if we have already finished, restart
+				done = false;
+				switchEpps();
+			}
+		} else {
+			autoplayText.innerHTML = 'Netflix autoplay off';
+		}
+	}
+
+	//ask the user for the number of episodes they want
+	getNumberOfEpisodesToWatch();
+
+	//handler for pause button
+	function pause() {
+		if(pauseButton.innerHTML === '||') {
+			paused = true;
+			pauseButton.innerHTML = '>';
+		} else {
+			paused = false;
+			pauseButton.innerHTML = '||';
+		}
+	}
+
+	//handles editing the buffer delay
+	function delayEdit(e) {
+		if((!e.keyCode || e.keyCode === 13) && !isNaN(delay.innerHTML)) {
+			timerDelay = parseInt(delay.innerHTML, 10);
+
+			if (!e) var e = window.event;
+			e.cancelBubble = true;
+			if (e.stopPropagation) e.stopPropagation();
+			return false;
+		}
+	}
+
+	//handler for editing time left to play
+	function editTime(e) {
+		timerNode.contentEditable=true;
+		editingTime = true;
+
+		if (!e) var e = window.event;
+		e.cancelBubble = true;
+		if (e.stopPropagation) e.stopPropagation();
+		return false;
+	}
+
+	//handles updating time left to play after user edit
+	function endEdit(e) {
+		if(timerNode.contentEditable.toString() === 'true' && (e.type === 'blur' || e.keyCode === 13)) {
+			timerNode.contentEditable = false;
+			editingTime = false;
+
+			var time = timerNode.innerHTML;
+			if(time.indexOf(':') >0) { //converts minutes:seconds into time
+				time = time.split(':');
+				countdownTimer = parseInt(time[0], 10)*60 + parseInt(time[1], 10);
+			} else {					//converts just seconds into time
+				if(!isNaN(time)) {
+					countdownTimer = parseInt(time, 10);
+				}
+			}
+
+			if (!e) var e = window.event;
+			e.cancelBubble = true;
+			if (e.stopPropagation) e.stopPropagation();
+			return false;
+		}
+	}
+
+	//Does everything to change to the next episode
+	function switchEpps() {
+		//setup the script for the next epp
+		ini = ini.replace(/,EpisodeMovieId=\d*/,',EpisodeMovieId=' + nextEpp.id);
+
+		//switch out data to the new epps
+		currentEpp = nextEpp;
+		nextEpp = getNextEpisodeData(currentEpp.id);
+
+		//Switch to next epp & update text
+		if(currentEpp) {
+			autoplayText.innerHTML = 'Netflix autoplay on, Episodes left: ' + numToWatch;
+			updateCountdown();
+			eval(ini);
+			nextEppTimer();
+		} else {
+			autoplayText.innerHTML = 'There does not seem to be a next episode.';
+		}
+	}
+
+	//Main loop, updates our timer and stuff, switches to next epp when necessary, yadayda
+	function nextEppTimer() {
+		setTimeout(function() {
+			if(isNaN(countdownTimer) || isNaN(numToWatch)) {
+				autoplayText.innerHTML = 'NUMBERS DO NOT WORK THAT WAY!  GOOD NIGHT!';
+				nextEppTimer();
+				return;
+			}
+
+			if(countdownTimer <= 0) {
+				if(numToWatch-- > 0) {
+					switchEpps();
+				} else {
+					done = true;
+					autoplayText.innerHTML = 'Netflix autoplay completed.';
+					numToWatch = 0;
+				}
+			} else {
+				if(!editingTime && !paused) {
+					countdownTimer--;
+					updateTime();
+				}
+				nextEppTimer();
+			}
+		}, 1000);
+	}
+
+	//attach the events we need
+	autoplayText.addEventListener('click', getNumberOfEpisodesToWatch, false);
+	pauseButton.addEventListener('click', pause, false);
+	timerNode.addEventListener('click', editTime, false);
+	timerNode.addEventListener('blur', endEdit, false);
+	timerNode.addEventListener('keypress', endEdit, false);
+	delay.addEventListener('blur', delayEdit, false);
+	delay.addEventListener('keyup', delayEdit, false);
+
+	//START EVERYTHING!
+	nextEppTimer();
+})();
